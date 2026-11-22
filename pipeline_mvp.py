@@ -204,6 +204,7 @@ def analyze_trends_with_ai(signals: list[dict]) -> dict:
   ]
 }}
 reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或使用網站首頁。沒有來源連結的話題不要輸出。
+事件脈絡只根據輸入標題撰寫；標題沒有提供的數字、價格、政策細節或醫療結論，不得當成已確認事實。
 """
     response = client.chat.completions.create(
         model=LLM_MODEL,
@@ -232,7 +233,7 @@ def send_webhook(message: str):
 # ==========================================
 def verified_reports(reports: list[dict], signals: list[dict]) -> list[dict]:
     sources_by_url = {
-        signal["url"]: signal["source"]
+        signal["url"]: {"source": signal["source"], "title": signal["title"]}
         for signal in signals
         if signal.get("url", "").startswith("https://")
     }
@@ -248,7 +249,8 @@ def verified_reports(reports: list[dict], signals: list[dict]) -> list[dict]:
             print(f"[Warning] 略過沒有可核對來源的報告: {report.get('topic_name', '未命名')}")
             continue
         report["reference_urls"] = matched
-        report["sources_involved"] = [sources_by_url[url] for url in matched]
+        report["sources_involved"] = [sources_by_url[url]["source"] for url in matched]
+        report["source_titles"] = [sources_by_url[url]["title"] for url in matched]
         verified.append(report)
     return verified[:MAX_FINAL_REPORTS]
 

@@ -516,7 +516,9 @@
     }
 
     .source-link {
-      display: inline-block;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
       font-size: 1rem;
       color: var(--primary-dark);
       background: var(--primary-soft);
@@ -524,6 +526,13 @@
       border-radius: 8px;
       text-decoration: none;
       font-weight: 700;
+      overflow-wrap: anywhere;
+      width: 100%;
+    }
+
+    .source-title {
+      color: var(--ink);
+      font-weight: 500;
     }
 
     .source-link:hover {
@@ -892,14 +901,16 @@
         `更新：${currentData.updated_at}（台灣時間）｜掃描 ${currentData.total_signals_scanned} 則訊號`;
 
       if (!isDemo) {
-        const notes = [];
+        const notes = ["AI 分析根據公開標題產生，請開啟原始來源核對細節。"];
         const updated = new Date(String(currentData.updated_at).replace(" ", "T") + "+08:00");
         if (!Number.isFinite(updated.getTime()) || Date.now() - updated.getTime() > 12 * 60 * 60 * 1000) {
           notes.push("資料已超過 12 小時未更新，請留意時效。 ");
         }
-        const ptt = Object.values(currentData.ptt_status || {});
+        const ptt = Object.entries(currentData.ptt_status || {});
         if (ptt.length) {
-          notes.push(`PTT 官方 Atom：${ptt.filter(value => value === "available").length}/${ptt.length} 個看板有近期文章；不含推文數。`);
+          const available = ptt.filter(([, value]) => value === "available").length;
+          const missing = ptt.filter(([, value]) => value !== "available").map(([board]) => board);
+          notes.push(`PTT 官方 Atom：${available}/${ptt.length} 個看板有近期文章；不含推文數。${missing.length ? `目前未取得：${missing.join("、")}。` : ""}`);
         }
         if (notes.length) {
           const note = document.getElementById("data-note");
@@ -1038,7 +1049,7 @@
         (Array.isArray(item.reference_urls) ? item.reference_urls : []).map((url, i) => {
           const safeUrl = safeSourceUrl(url);
           if (!safeUrl) return "";
-          return `<a class="source-link" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ ${escapeHtml(item.sources_involved?.[i] || `原始來源 ${i + 1}`)}</a>`;
+          return `<a class="source-link" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer"><strong>↗ ${escapeHtml(item.sources_involved?.[i] || `原始來源 ${i + 1}`)}</strong><span class="source-title">${escapeHtml(item.source_titles?.[i] || "檢視原始標題")}</span></a>`;
         }).join("") || "這則報告沒有可開啟的來源連結。";
 
       document.getElementById("drawer-content").innerHTML = `
