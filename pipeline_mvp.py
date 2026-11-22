@@ -38,7 +38,7 @@ client = OpenAI(
     api_key=os.getenv("LLM_API_KEY"),
     base_url=os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 )
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
