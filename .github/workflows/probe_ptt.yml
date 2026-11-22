@@ -1,0 +1,28 @@
+name: Probe PTT official sources
+on:
+  push:
+    branches: [codex/complete-source-coverage]
+    paths: [.github/workflows/probe_ptt.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check official endpoints
+        run: |
+          python -m pip install requests
+          python - <<'PY'
+          import requests
+          for url in (
+              "https://www.ptt.cc/atom/Stock.xml",
+              "https://www.ptt.cc/bbs/Stock/index.html",
+              "https://www.ptt.cc/atom/Gossiping.xml",
+              "https://www.ptt.cc/atom/Lifeismoney.xml",
+          ):
+              try:
+                  response = requests.get(url, timeout=12)
+                  print(f"{url}: {response.status_code}, {len(response.content)} bytes, {response.headers.get('content-type', '')}")
+              except Exception as exc:
+                  print(f"{url}: {type(exc).__name__}: {exc}")
+          PY
