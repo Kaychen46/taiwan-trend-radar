@@ -41,7 +41,7 @@ class SourceCollectionTests(unittest.TestCase):
         recent = format_datetime(datetime.now(timezone.utc))
         stale = format_datetime(datetime.now(timezone.utc) - timedelta(days=3))
         rss = f"""<rss><channel>
-          <item><title>[新聞] 測試財經標題 - 看板 Stock - ptt.cc</title>
+          <item><title>[新聞] 測試財經標題- 看板 Stock - ptt.cc</title>
             <link>https://news.google.com/rss/articles/stock-good?oc=5</link>
             <pubDate>{recent}</pubDate></item>
           <item><title>[新聞] 其他看板 - 看板 Gossiping - ptt.cc</title>
