@@ -606,7 +606,7 @@
 
   <!-- 右側抽屜式 AI 深度報告 -->
   <div class="drawer-backdrop" id="drawer-backdrop"></div>
-  <aside class="drawer" id="report-drawer" aria-hidden="true">
+  <aside class="drawer" id="report-drawer" role="dialog" aria-labelledby="drawer-title" aria-hidden="true">
     <div class="drawer-header">
       <div>
         <div id="drawer-badges" style="margin-bottom:0.6rem; display:flex; gap:0.5rem; flex-wrap:wrap;"></div>
@@ -867,6 +867,7 @@
     let currentFilter = "ALL";
     let activePlaybooks = [];
     let isDemo = false;
+    let lastTrigger = null;
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -976,7 +977,7 @@
         : (hero.ecommerce_radar || "點擊查看商業分析");
 
       heroSlot.innerHTML = `
-        <article class="hero-card" onclick="openDrawer(${heroIndex})">
+        <article class="hero-card" role="button" tabindex="0" onclick="openDrawer(${heroIndex}, this)" onkeydown="handleCardKey(event, ${heroIndex}, this)">
           <div class="hero-top">
             <span class="hero-badge-cat">🏆 本期焦點 · ${escapeHtml(hero.category)}</span>
             ${hero.is_dark_horse ? `<span class="hero-badge-dh">🐎 黑馬飆升</span>` : ``}
@@ -1001,7 +1002,7 @@
           : (item.ecommerce_radar || "點擊查看商業分析");
 
         return `
-          <article class="card" onclick="openDrawer(${idx})">
+          <article class="card" role="button" tabindex="0" onclick="openDrawer(${idx}, this)" onkeydown="handleCardKey(event, ${idx}, this)">
             <div>
               <div class="card-top">
                 <span class="badge-cat">${escapeHtml(item.category)}</span>
@@ -1026,9 +1027,17 @@
       }).join("");
     }
 
-    function openDrawer(index) {
+    function handleCardKey(event, index, trigger) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openDrawer(index, trigger);
+      }
+    }
+
+    function openDrawer(index, trigger) {
       const item = currentData.trends[index];
       if (!item) return;
+      lastTrigger = trigger || document.activeElement;
 
       activePlaybooks = Array.isArray(item.creator_playbook) ? item.creator_playbook : [];
 
@@ -1077,12 +1086,18 @@
       `;
 
       document.getElementById("drawer-backdrop").classList.add("open");
-      document.getElementById("report-drawer").classList.add("open");
+      const drawer = document.getElementById("report-drawer");
+      drawer.setAttribute("aria-hidden", "false");
+      drawer.classList.add("open");
+      document.getElementById("close-drawer").focus();
     }
 
     function closeDrawer() {
       document.getElementById("drawer-backdrop").classList.remove("open");
-      document.getElementById("report-drawer").classList.remove("open");
+      const drawer = document.getElementById("report-drawer");
+      drawer.classList.remove("open");
+      lastTrigger?.focus();
+      drawer.setAttribute("aria-hidden", "true");
     }
 
     function copyPlaybook(btn, idx) {
@@ -1105,6 +1120,11 @@
 
     document.getElementById("close-drawer").addEventListener("click", closeDrawer);
     document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && document.getElementById("report-drawer").classList.contains("open")) {
+        closeDrawer();
+      }
+    });
     loadTrends();
   </script>
 </body>
