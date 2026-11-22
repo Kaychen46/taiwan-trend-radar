@@ -214,16 +214,19 @@
       display: flex;
     }
 
-    .dismiss-btn {
-      background: transparent;
-      border: 1.5px solid #C5A138;
-      color: #5C4300;
+    .data-note {
+      display: none;
+      background: var(--primary-soft);
+      border: 1.5px solid var(--primary);
+      color: var(--primary-dark);
+      padding: 0.9rem 1.15rem;
+      border-radius: 12px;
+      margin-bottom: 1.75rem;
       font-size: 1rem;
-      font-weight: 700;
-      padding: 0.2rem 0.65rem;
-      border-radius: 8px;
-      cursor: pointer;
-      flex-shrink: 0;
+    }
+
+    .data-note.show {
+      display: block;
     }
 
     /* 頭條 Hero 大卡 */
@@ -581,10 +584,10 @@
       <div class="content-inner">
         <div class="demo-banner" id="demo-banner">
           <div>
-            💡 目前顯示為<strong>內建示範資料</strong>。上線並執行 GitHub Actions 排程後，畫面會自動切換為 <code>data/latest_trends.json</code> 的每日真實台灣爆點情報。
+            💡 <strong>示範內容，非真實趨勢。</strong> 目前沒有可用的即時資料。下方話題僅用來展示網站功能，請勿作為事實或行銷決策依據。
           </div>
-          <button class="dismiss-btn" id="dismiss-demo">隱藏</button>
         </div>
+        <div class="data-note" id="data-note" role="status"></div>
 
         <div id="hero-slot"></div>
         <div class="grid" id="trend-grid"></div>
@@ -607,8 +610,8 @@
 
   <script>
     const FALLBACK_DATA = {
-      updated_at: "2026-11-22 18:00（示範資料）",
-      total_signals_scanned: 65,
+      updated_at: "示範內容，非即時",
+      total_signals_scanned: 0,
       trends: [
         {
           topic_name: "超商冬季聯名熱飲爆紅：Threads 脆友實測「隱藏喝法」破百萬瀏覽",
@@ -854,21 +857,56 @@
     let currentPersona = "creator";
     let currentFilter = "ALL";
     let activePlaybooks = [];
+    let isDemo = false;
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[char]);
+    }
+
+    function safeSourceUrl(value) {
+      try {
+        const url = new URL(value);
+        return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+      } catch {
+        return null;
+      }
+    }
 
     async function loadTrends() {
       try {
         const res = await fetch("./data/latest_trends.json", { cache: "no-store" });
         if (!res.ok) throw new Error("No live JSON");
         const parsed = await res.json();
-        if (!parsed.trends || !parsed.trends.length) throw new Error("Empty JSON");
+        if (!Array.isArray(parsed.trends) || !parsed.trends.length) throw new Error("Empty JSON");
         currentData = parsed;
       } catch (err) {
         currentData = FALLBACK_DATA;
+        isDemo = true;
         document.getElementById("demo-banner").classList.add("show");
       }
 
       document.getElementById("meta-info").textContent =
-        `更新：${currentData.updated_at} ｜ 掃描 ${currentData.total_signals_scanned} 則訊號`;
+        isDemo ? "示範資料｜未掃描真實訊號" :
+        `更新：${currentData.updated_at}（台灣時間）｜掃描 ${currentData.total_signals_scanned} 則訊號`;
+
+      if (!isDemo) {
+        const notes = [];
+        const updated = new Date(String(currentData.updated_at).replace(" ", "T") + "+08:00");
+        if (!Number.isFinite(updated.getTime()) || Date.now() - updated.getTime() > 12 * 60 * 60 * 1000) {
+          notes.push("資料已超過 12 小時未更新，請留意時效。 ");
+        }
+        const ptt = Object.values(currentData.ptt_status || {});
+        if (ptt.length) {
+          notes.push(`PTT 官方 Atom：${ptt.filter(value => value === "available").length}/${ptt.length} 個看板有近期文章；不含推文數。`);
+        }
+        if (notes.length) {
+          const note = document.getElementById("data-note");
+          note.textContent = notes.join(" ");
+          note.classList.add("show");
+        }
+      }
 
       renderNav();
       renderView();
@@ -929,17 +967,17 @@
       heroSlot.innerHTML = `
         <article class="hero-card" onclick="openDrawer(${heroIndex})">
           <div class="hero-top">
-            <span class="hero-badge-cat">🏆 本期焦點 · ${hero.category}</span>
+            <span class="hero-badge-cat">🏆 本期焦點 · ${escapeHtml(hero.category)}</span>
             ${hero.is_dark_horse ? `<span class="hero-badge-dh">🐎 黑馬飆升</span>` : ``}
           </div>
-          <h2>${hero.topic_name}</h2>
-          <p class="hero-tldr">${hero.tldr}</p>
+          <h2>${escapeHtml(hero.topic_name)}</h2>
+          <p class="hero-tldr">${escapeHtml(hero.tldr)}</p>
           <div class="hero-persona-box">
             <strong>${personaTitle}</strong>
-            <span>${heroPersonaText}</span>
+            <span>${escapeHtml(heroPersonaText)}</span>
           </div>
           <div class="hero-footer">
-            <span>🔥 熱度 ${hero.heat_score} ｜ ⚡ 黑馬 ${hero.dark_horse_score}</span>
+            <span>🔥 熱度 ${escapeHtml(hero.heat_score)} ｜ ⚡ 黑馬 ${escapeHtml(hero.dark_horse_score)}</span>
             <span>閱讀 AI 完整拆解報告 →</span>
           </div>
         </article>
@@ -955,20 +993,20 @@
           <article class="card" onclick="openDrawer(${idx})">
             <div>
               <div class="card-top">
-                <span class="badge-cat">${item.category}</span>
+                <span class="badge-cat">${escapeHtml(item.category)}</span>
                 ${item.is_dark_horse ? `<span class="badge-dh">🐎 黑馬</span>` : ``}
               </div>
-              <h3>${item.topic_name}</h3>
-              <p class="card-tldr">${item.tldr}</p>
+              <h3>${escapeHtml(item.topic_name)}</h3>
+              <p class="card-tldr">${escapeHtml(item.tldr)}</p>
               <div class="persona-box">
                 <strong>${personaTitle}</strong>
-                <span>${personaText}</span>
+                <span>${escapeHtml(personaText)}</span>
               </div>
             </div>
             <div class="card-footer">
               <div class="scores">
-                <span class="score-heat">🔥 ${item.heat_score}</span>
-                <span class="score-dh">⚡ ${item.dark_horse_score}</span>
+                <span class="score-heat">🔥 ${escapeHtml(item.heat_score)}</span>
+                <span class="score-dh">⚡ ${escapeHtml(item.dark_horse_score)}</span>
               </div>
               <span class="cta-link">拆解報告 →</span>
             </div>
@@ -981,36 +1019,37 @@
       const item = currentData.trends[index];
       if (!item) return;
 
-      activePlaybooks = item.creator_playbook || [];
+      activePlaybooks = Array.isArray(item.creator_playbook) ? item.creator_playbook : [];
 
       document.getElementById("drawer-badges").innerHTML = `
-        <span class="badge-cat">${item.category}</span>
+        <span class="badge-cat">${escapeHtml(item.category)}</span>
         ${item.is_dark_horse ? `<span class="badge-dh">🐎 黑馬飆升</span>` : ""}
       `;
       document.getElementById("drawer-title").textContent = item.topic_name;
 
       const playbooksHtml = activePlaybooks.map((text, i) => `
         <div class="playbook-item">
-          <span>${text}</span>
+          <span>${escapeHtml(text)}</span>
           <button class="copy-btn" onclick="copyPlaybook(this, ${i})">複製</button>
         </div>
       `).join("");
 
-      const sourcesHtml = (item.reference_urls || []).map((url, i) => `
-        <a class="source-link" href="${url}" target="_blank" rel="noopener noreferrer">
-          ↗ ${item.sources_involved?.[i] || `原始來源 ${i + 1}`}
-        </a>
-      `).join("");
+      const sourcesHtml = isDemo ? "示範內容沒有真實來源連結。" :
+        (Array.isArray(item.reference_urls) ? item.reference_urls : []).map((url, i) => {
+          const safeUrl = safeSourceUrl(url);
+          if (!safeUrl) return "";
+          return `<a class="source-link" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ ${escapeHtml(item.sources_involved?.[i] || `原始來源 ${i + 1}`)}</a>`;
+        }).join("") || "這則報告沒有可開啟的來源連結。";
 
       document.getElementById("drawer-content").innerHTML = `
         <div class="report-section">
           <h4>📌 30 秒事件脈絡 (TL;DR)</h4>
-          <p>${item.tldr}</p>
+          <p>${escapeHtml(item.tldr)}</p>
         </div>
         <div class="report-section">
           <h4>🧬 AI 爆紅基因拆解</h4>
-          <p><strong>情緒鉤子：</strong>${item.viral_dna?.hook_type || "-"}</p>
-          <p style="margin-top:0.5rem;"><strong>為何是現在：</strong>${item.viral_dna?.why_now || "-"}</p>
+          <p><strong>情緒鉤子：</strong>${escapeHtml(item.viral_dna?.hook_type || "-")}</p>
+          <p style="margin-top:0.5rem;"><strong>為何是現在：</strong>${escapeHtml(item.viral_dna?.why_now || "-")}</p>
         </div>
         <div class="report-section">
           <h4>🎬 創作者／行銷人可複製切角</h4>
@@ -1018,7 +1057,7 @@
         </div>
         <div class="report-section">
           <h4>🛒 電商選品與商業風向</h4>
-          <p>${item.ecommerce_radar || "-"}</p>
+          <p>${escapeHtml(item.ecommerce_radar || "-")}</p>
         </div>
         <div class="report-section">
           <h4>🔗 跨平台訊號來源（合規導流）</h4>
@@ -1055,10 +1094,6 @@
 
     document.getElementById("close-drawer").addEventListener("click", closeDrawer);
     document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
-    document.getElementById("dismiss-demo").addEventListener("click", () => {
-      document.getElementById("demo-banner").classList.remove("show");
-    });
-
     loadTrends();
   </script>
 </body>
