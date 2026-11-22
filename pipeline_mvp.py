@@ -3,9 +3,9 @@ import json
 import re
 import urllib.parse
 from datetime import datetime, timezone, timedelta
+from calendar import timegm
 import feedparser
 import requests
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -17,8 +17,9 @@ load_dotenv()
 MAX_ITEMS_PER_SOURCE = 15       # 每個來源最多抓 15 則
 MAX_SIGNALS_TO_AI = 65          # 每次送給 AI 聚類的訊號上限
 MAX_FINAL_REPORTS = 12          # 對齊前端：4 大分類各 2-3 則，共 12 則
+MAX_PTT_ITEMS_PER_BOARD = 6
 MIN_COMMERCIAL_VALUE = 3        # 商業價值守門員門檻（1-5分）
-PTT_MIN_PUSH = 30               # PTT 最低推文數門檻
+MAX_SIGNAL_AGE = timedelta(hours=36)
 
 NOISE_KEYWORDS = ["氣象", "降雨機率", "星座", "運勢", "威力彩", "大樂透", "今彩539", "地震速報", "公告"]
 
@@ -38,7 +39,7 @@ client = OpenAI(
     api_key=os.getenv("LLM_API_KEY"),
     base_url=os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 )
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
@@ -50,12 +51,23 @@ def is_noise(title: str) -> bool:
 # ==========================================
 # 2. 多平台數據採集模組 (Metadata-Only)
 # ==========================================
+def is_recent(entry: dict) -> bool:
+    published = entry.get("published_parsed") or entry.get("updated_parsed")
+    if not published:
+        return False
+    published_at = datetime.fromtimestamp(timegm(published), timezone.utc)
+    age = datetime.now(timezone.utc) - published_at
+    return timedelta(0) <= age <= MAX_SIGNAL_AGE
+
+
 def fetch_rss_signals() -> list[dict]:
     signals = []
     for src in RSS_SOURCES:
         try:
             feed = feedparser.parse(src["url"])
             for entry in feed.entries[:MAX_ITEMS_PER_SOURCE]:
+                if not is_recent(entry):
+                    continue
                 title = entry.get("title", "").strip()
                 link = entry.get("link", "").strip()
                 if is_noise(title):
@@ -72,48 +84,43 @@ def fetch_rss_signals() -> list[dict]:
     return signals
 
 
-def fetch_ptt_hot(boards: list[str] = None) -> list[dict]:
+def fetch_ptt_recent(boards: list[str] = None) -> tuple[list[dict], dict]:
     if boards is None:
         boards = ["Gossiping", "Stock", "Lifeismoney"]
     signals = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    cookies = {"over18": "1"}
+    status = {}
 
     for board in boards:
         try:
-            url = f"https://www.ptt.cc/bbs/{board}/index.html"
-            res = requests.get(url, headers=headers, cookies=cookies, timeout=10)
+            url = f"https://www.ptt.cc/atom/{board}.xml"
+            res = requests.get(url, timeout=10)
             res.raise_for_status()
-            soup = BeautifulSoup(res.text, "html.parser")
+            feed = feedparser.parse(res.content)
+            if feed.bozo and not feed.entries:
+                raise ValueError("Atom 摘要格式錯誤")
             count = 0
-
-            for ent in soup.select(".r-ent"):
-                nrec = ent.select_one(".nrec").text.strip()
-                a_tag = ent.select_one(".title a")
-                if not a_tag:
+            for entry in feed.entries:
+                if not is_recent(entry):
                     continue
-
-                push_score = 100 if nrec == "爆" else (int(nrec) if nrec.isdigit() else 0)
-                if push_score < PTT_MIN_PUSH:
+                title = entry.get("title", "").strip()
+                link = entry.get("link", "").strip()
+                if is_noise(title) or not link.startswith("https://www.ptt.cc/bbs/"):
                     continue
-
-                title = a_tag.text.strip()
-                if is_noise(title):
-                    continue
-
                 signals.append({
                     "source": f"PTT_{board}",
                     "source_type": "forum",
                     "title": title,
-                    "url": "https://www.ptt.cc" + a_tag["href"],
-                    "metric": f"推文:{nrec}"
+                    "url": link,
+                    "metric": "PTT 近期文章（未提供推文數）"
                 })
                 count += 1
-                if count >= 6:
+                if count >= MAX_PTT_ITEMS_PER_BOARD:
                     break
+            status[board] = "available" if count else "empty"
         except Exception as e:
             print(f"[Warning] PTT {board} 抓取失敗: {e}")
-    return signals
+            status[board] = "unavailable"
+    return signals, status
 
 
 def fetch_youtube_trending_tw() -> list[dict]:
@@ -164,7 +171,7 @@ def clean_json_text(raw: str) -> str:
 def analyze_trends_with_ai(signals: list[dict]) -> dict:
     system_prompt = f"""
 你是一位頂尖的「台灣流量操盤手兼電商選品總監」。
-我會提供台灣近 24 小時來自搜尋趨勢、商業媒體、PTT 熱門看板、YouTube 發燒與社群破圈的公開標題清單。
+我會提供台灣近 36 小時來自搜尋趨勢、商業媒體、PTT 近期文章、YouTube 發燒與社群破圈的公開標題清單。
 
 請執行以下三步驟，並嚴格輸出純 JSON 格式：
 1. **跨平台聚類**：將討論同一事件或趨勢的標題合併為一個話題。
@@ -182,7 +189,7 @@ def analyze_trends_with_ai(signals: list[dict]) -> dict:
       "dark_horse_score": 92,
       "commercial_value": 5,
       "sources_involved": ["GoogleTrends_TW", "PTT_Stock"],
-      "reference_urls": ["原始連結1", "原始連結2"],
+      "reference_urls": ["從輸入訊號的 url 欄位原樣複製的連結1", "連結2"],
       "tldr": "30字內一針見血的事件脈絡",
       "viral_dna": {{
         "hook_type": "情緒鉤子類型（如：省錢焦慮、認知反差、獵奇共鳴）",
@@ -196,6 +203,8 @@ def analyze_trends_with_ai(signals: list[dict]) -> dict:
     }}
   ]
 }}
+reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或使用網站首頁。沒有來源連結的話題不要輸出。
+事件脈絡只根據輸入標題撰寫；標題沒有提供的數字、價格、政策細節或醫療結論，不得當成已確認事實。
 """
     response = client.chat.completions.create(
         model=LLM_MODEL,
@@ -222,28 +231,56 @@ def send_webhook(message: str):
 # ==========================================
 # 4. 主流程執行
 # ==========================================
+def verified_reports(reports: list[dict], signals: list[dict]) -> list[dict]:
+    sources_by_url = {
+        signal["url"]: {"source": signal["source"], "title": signal["title"]}
+        for signal in signals
+        if signal.get("url", "").startswith("https://")
+    }
+    verified = []
+    for report in reports:
+        if not isinstance(report, dict):
+            continue
+        urls = report.get("reference_urls") or []
+        if not isinstance(urls, list):
+            continue
+        matched = list(dict.fromkeys(url for url in urls if isinstance(url, str) and url in sources_by_url))[:3]
+        if not matched:
+            print(f"[Warning] 略過沒有可核對來源的報告: {report.get('topic_name', '未命名')}")
+            continue
+        report["reference_urls"] = matched
+        report["sources_involved"] = [sources_by_url[url]["source"] for url in matched]
+        report["source_titles"] = [sources_by_url[url]["title"] for url in matched]
+        verified.append(report)
+    return verified[:MAX_FINAL_REPORTS]
+
+
 def main():
     tz_tw = timezone(timedelta(hours=8))
     now_str = datetime.now(tz_tw).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now_str}] 啟動台灣爆點雷達 v2.1 (12題材版)...")
 
     try:
-        all_signals = []
-        all_signals.extend(fetch_rss_signals())
-        all_signals.extend(fetch_ptt_hot())
-        all_signals.extend(fetch_youtube_trending_tw())
+        rss_signals = fetch_rss_signals()
+        ptt_signals, ptt_status = fetch_ptt_recent()
+        youtube_signals = fetch_youtube_trending_tw()
 
-        signals = all_signals[:MAX_SIGNALS_TO_AI]
+        # Reserve space for PTT so it cannot be squeezed out by earlier RSS feeds.
+        signals = (ptt_signals + rss_signals + youtube_signals)[:MAX_SIGNALS_TO_AI]
         if not signals:
             raise ValueError("未抓取到任何有效訊號，請檢查網路連線。")
 
         print(f"成功採集 {len(signals)} 則跨平台訊號，送入 Gemini 情報引擎...")
         result = analyze_trends_with_ai(signals)
+        reports = verified_reports(result.get("trends", []), signals)
+        if not reports:
+            raise ValueError("AI 未產生任何附有可核對來源的報告。")
 
         output_payload = {
             "updated_at": now_str,
             "total_signals_scanned": len(signals),
-            "trends": result.get("trends", [])
+            "ptt_status": ptt_status,
+            "trends": reports
         }
 
         os.makedirs("data", exist_ok=True)
@@ -253,7 +290,8 @@ def main():
         top_lines = [f"🔥 **台灣爆點雷達更新 ({now_str})**"]
         for idx, t in enumerate(output_payload["trends"][:3], 1):
             badge = "🐎黑馬" if t.get("is_dark_horse") else "📈熱門"
-            top_lines.append(f"{idx}. [{badge}] **{t['topic_name']}** (熱度 {t['heat_score']})\n   └ 切角：{t['creator_playbook'][0]}")
+            playbook = (t.get("creator_playbook") or ["請開啟網站查看完整報告"])[0]
+            top_lines.append(f"{idx}. [{badge}] **{t.get('topic_name', '未命名話題')}** (熱度 {t.get('heat_score', '-')})\n   └ 切角：{playbook}")
         send_webhook("\n".join(top_lines))
         print(f"完成！共產出 {len(output_payload['trends'])} 則情報，已寫入 data/latest_trends.json")
 

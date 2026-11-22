@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: radar-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   run-pipeline:
@@ -21,15 +25,45 @@ jobs:
       - name: Run Trend Radar
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_MODEL: gemini-3.5-flash-lite
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python pipeline_mvp.py
-      - name: Commit updated JSON
+      - name: Prepare static site
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "Trend Radar Bot"
-          git add data/latest_trends.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update trends data"
-          git push
+          mkdir -p site/data
+          cp index.html site/index.html
+          cp data/latest_trends.json site/data/latest_trends.json
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trend-radar-review
+          path: site/
+          retention-days: 7
+
+  deploy-pages:
+    if: github.ref == 'refs/heads/main'
+    needs: run-pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download static site
+        uses: actions/download-artifact@v4
+        with:
+          name: trend-radar-review
+          path: site/
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
