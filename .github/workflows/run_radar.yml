@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: '0 0,4,8,12 * * *'
   workflow_dispatch:
-  push:
-    branches:
-      - copilot/fix-failing-github-actions-job-run-pipeline
 
 permissions:
   contents: read
