@@ -25,4 +25,16 @@ jobs:
                   print(f"{url}: {response.status_code}, {len(response.content)} bytes, {response.headers.get('content-type', '')}")
               except Exception as exc:
                   print(f"{url}: {type(exc).__name__}: {exc}")
+          print("Google News indexed Stock:")
+          import xml.etree.ElementTree as ET
+          r = requests.get(
+              "https://news.google.com/rss/search",
+              params={"q": "site:ptt.cc/bbs/Stock when:1d", "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"},
+              timeout=12,
+          )
+          items = ET.fromstring(r.content).findall("./channel/item")
+          stock = [i for i in items if (i.findtext("title") or "").endswith("看板 Stock - ptt.cc")]
+          print(f"status={r.status_code}, all={len(items)}, explicit_stock={len(stock)}")
+          for item in stock[:3]:
+              print((item.findtext("title"), item.findtext("pubDate"), item.findtext("link")))
           PY
