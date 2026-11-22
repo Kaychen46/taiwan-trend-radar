@@ -1,9 +1,6 @@
 ﻿name: Taiwan Trend Radar Pipeline
 
 on:
-  push:
-    branches:
-      - copilot/fix-failing-github-actions-job-run-pipeline
   schedule:
     - cron: '0 0,4,8,12 * * *'
   workflow_dispatch:
