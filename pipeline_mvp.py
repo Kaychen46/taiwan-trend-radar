@@ -29,7 +29,7 @@ def build_google_news_rss(query: str) -> str:
 
 RSS_SOURCES = [
     {"name": "GoogleTrends_TW", "type": "search", "url": "https://trends.google.com/trending/rss?geo=TW"},
-    {"name": "數位時代", "type": "tech_biz", "url": "https://www.bnext.com.tw/rss"},
+    {"name": "數位時代", "type": "tech_biz", "url": "https://rss.bnextmedia.com.tw/feed/bnext"},
     {"name": "Threads_破圈代理", "type": "social_proxy", "url": build_google_news_rss("Threads 爆紅 OR 脆友 OR 網友熱議")},
     {"name": "Dcard_破圈代理", "type": "social_proxy", "url": build_google_news_rss("Dcard 熱議 OR 網友討論")},
     {"name": "財經投資代理", "type": "finance", "url": build_google_news_rss("ETF OR 台股 OR 財經 熱門")},
@@ -104,7 +104,7 @@ def fetch_ptt_stock_indexed() -> list[dict]:
     if feed.bozo and not feed.entries:
         raise ValueError("Stock 索引摘要格式錯誤")
     signals = []
-    suffix = " - 看板 Stock - ptt.cc"
+    suffix = "- 看板 Stock - ptt.cc"
     for entry in feed.entries:
         title = entry.get("title", "").strip()
         link = entry.get("link", "").strip()
