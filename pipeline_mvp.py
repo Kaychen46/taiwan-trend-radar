@@ -29,7 +29,7 @@ def build_google_news_rss(query: str) -> str:
 
 RSS_SOURCES = [
     {"name": "GoogleTrends_TW", "type": "search", "url": "https://trends.google.com/trending/rss?geo=TW"},
-    {"name": "數位時代", "type": "tech_biz", "url": "https://www.bnext.com.tw/rss"},
+    {"name": "數位時代", "type": "tech_biz", "url": "https://rss.bnextmedia.com.tw/feed/bnext"},
     {"name": "Threads_破圈代理", "type": "social_proxy", "url": build_google_news_rss("Threads 爆紅 OR 脆友 OR 網友熱議")},
     {"name": "Dcard_破圈代理", "type": "social_proxy", "url": build_google_news_rss("Dcard 熱議 OR 網友討論")},
     {"name": "財經投資代理", "type": "finance", "url": build_google_news_rss("ETF OR 台股 OR 財經 熱門")},
@@ -60,27 +60,68 @@ def is_recent(entry: dict) -> bool:
     return timedelta(0) <= age <= MAX_SIGNAL_AGE
 
 
-def fetch_rss_signals() -> list[dict]:
+def fetch_rss_signals() -> tuple[list[dict], dict]:
     signals = []
+    status = {}
     for src in RSS_SOURCES:
         try:
             feed = feedparser.parse(src["url"])
+            if feed.bozo and not feed.entries:
+                raise ValueError(f"RSS 摘要格式錯誤: {feed.bozo_exception}")
+            source_signals = []
             for entry in feed.entries[:MAX_ITEMS_PER_SOURCE]:
                 if not is_recent(entry):
                     continue
                 title = entry.get("title", "").strip()
                 link = entry.get("link", "").strip()
-                if is_noise(title):
+                if is_noise(title) or not link.startswith("https://"):
                     continue
-                signals.append({
+                source_signals.append({
                     "source": src["name"],
                     "source_type": src["type"],
                     "title": title,
                     "url": link,
                     "metric": "RSS熱門"
                 })
+            signals.extend(source_signals)
+            count = len(source_signals)
+            status[src["name"]] = {"state": "available" if count else "empty", "count": count}
         except Exception as e:
             print(f"[Warning] RSS {src['name']} 抓取失敗: {e}")
+            status[src["name"]] = {"state": "unavailable", "count": 0}
+    return signals, status
+
+
+def fetch_ptt_stock_indexed() -> list[dict]:
+    """Stock 官方入口不可用時，採用明確標示的 Google 新聞索引標題。"""
+    res = requests.get(
+        "https://news.google.com/rss/search",
+        params={"q": "site:ptt.cc/bbs/Stock when:1d", "hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"},
+        timeout=10,
+    )
+    res.raise_for_status()
+    feed = feedparser.parse(res.content)
+    if feed.bozo and not feed.entries:
+        raise ValueError("Stock 索引摘要格式錯誤")
+    signals = []
+    suffix = "- 看板 Stock - ptt.cc"
+    for entry in feed.entries:
+        title = entry.get("title", "").strip()
+        link = entry.get("link", "").strip()
+        if not title.endswith(suffix) or not is_recent(entry):
+            continue
+        title = title[:-len(suffix)].strip()
+        if is_noise(title) or not link.startswith("https://news.google.com/rss/articles/"):
+            continue
+        signals.append({
+            "source": "PTT_Stock_索引",
+            "source_type": "forum_proxy",
+            "title": title,
+            "url": link,
+            "metric": "Google 新聞索引的 PTT Stock 標題（非官方 Atom、無推文數）",
+        })
+        if len(signals) >= MAX_PTT_ITEMS_PER_BOARD:
+            break
     return signals
 
 
@@ -119,13 +160,22 @@ def fetch_ptt_recent(boards: list[str] = None) -> tuple[list[dict], dict]:
             status[board] = "available" if count else "empty"
         except Exception as e:
             print(f"[Warning] PTT {board} 抓取失敗: {e}")
+            if board == "Stock":
+                try:
+                    indexed = fetch_ptt_stock_indexed()
+                    if indexed:
+                        signals.extend(indexed)
+                        status[board] = "indexed"
+                        continue
+                except Exception as indexed_error:
+                    print(f"[Warning] PTT Stock 索引抓取失敗: {indexed_error}")
             status[board] = "unavailable"
     return signals, status
 
 
-def fetch_youtube_trending_tw() -> list[dict]:
+def fetch_youtube_trending_tw() -> tuple[list[dict], dict]:
     if not YOUTUBE_API_KEY:
-        return []
+        return [], {"YouTube_TW發燒": {"state": "not_configured", "count": 0}}
 
     signals = []
     try:
@@ -154,7 +204,8 @@ def fetch_youtube_trending_tw() -> list[dict]:
             })
     except Exception as e:
         print(f"[Warning] YouTube 發燒抓取失敗: {e}")
-    return signals
+        return signals, {"YouTube_TW發燒": {"state": "unavailable", "count": len(signals)}}
+    return signals, {"YouTube_TW發燒": {"state": "available" if signals else "empty", "count": len(signals)}}
 
 
 # ==========================================
@@ -250,7 +301,12 @@ def verified_reports(reports: list[dict], signals: list[dict]) -> list[dict]:
             continue
         report["reference_urls"] = matched
         report["sources_involved"] = [sources_by_url[url]["source"] for url in matched]
-        report["source_titles"] = [sources_by_url[url]["title"] for url in matched]
+        report["source_titles"] = [
+            f"Google 新聞索引顯示：{sources_by_url[url]['title']}"
+            if sources_by_url[url]["source"] == "PTT_Stock_索引"
+            else sources_by_url[url]["title"]
+            for url in matched
+        ]
         verified.append(report)
     return verified[:MAX_FINAL_REPORTS]
 
@@ -261,9 +317,15 @@ def main():
     print(f"[{now_str}] 啟動台灣爆點雷達 v2.1 (12題材版)...")
 
     try:
-        rss_signals = fetch_rss_signals()
+        rss_signals, rss_status = fetch_rss_signals()
         ptt_signals, ptt_status = fetch_ptt_recent()
-        youtube_signals = fetch_youtube_trending_tw()
+        youtube_signals, youtube_status = fetch_youtube_trending_tw()
+
+        source_status = dict(rss_status)
+        for board, state in ptt_status.items():
+            count = sum(signal["source"] in (f"PTT_{board}", f"PTT_{board}_索引") for signal in ptt_signals)
+            source_status[f"PTT_{board}"] = {"state": state, "count": count}
+        source_status.update(youtube_status)
 
         # Reserve space for PTT so it cannot be squeezed out by earlier RSS feeds.
         signals = (ptt_signals + rss_signals + youtube_signals)[:MAX_SIGNALS_TO_AI]
@@ -280,6 +342,7 @@ def main():
             "updated_at": now_str,
             "total_signals_scanned": len(signals),
             "ptt_status": ptt_status,
+            "source_status": source_status,
             "trends": reports
         }
 

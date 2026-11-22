@@ -229,6 +229,20 @@
       display: block;
     }
 
+    .source-status {
+      margin: -0.9rem 0 1.75rem;
+      padding: 0.8rem 1.15rem;
+      border: 1px solid var(--primary);
+      border-radius: 12px;
+      color: var(--primary-dark);
+      background: var(--primary-soft);
+    }
+
+    .source-status[hidden] { display: none; }
+    .source-status summary { cursor: pointer; font-weight: 700; }
+    .source-status ul { margin: 0.75rem 0 0; padding-left: 1.25rem; }
+    .source-status li + li { margin-top: 0.3rem; }
+
     /* 頭條 Hero 大卡 */
     .hero-card {
       background: var(--primary);
@@ -597,6 +611,10 @@
           </div>
         </div>
         <div class="data-note" id="data-note" role="status"></div>
+        <details class="source-status" id="source-status" hidden>
+          <summary>來源採集明細</summary>
+          <ul id="source-status-list"></ul>
+        </details>
 
         <div id="hero-slot"></div>
         <div class="grid" id="trend-grid"></div>
@@ -910,8 +928,34 @@
         const ptt = Object.entries(currentData.ptt_status || {});
         if (ptt.length) {
           const available = ptt.filter(([, value]) => value === "available").length;
-          const missing = ptt.filter(([, value]) => value !== "available").map(([board]) => board);
-          notes.push(`PTT 官方 Atom：${available}/${ptt.length} 個看板有近期文章；不含推文數。${missing.length ? `目前未取得：${missing.join("、")}。` : ""}`);
+          const indexed = ptt.filter(([, value]) => value === "indexed").map(([board]) => board);
+          const missing = ptt.filter(([, value]) => value === "unavailable").map(([board]) => board);
+          const empty = ptt.filter(([, value]) => value === "empty").map(([board]) => board);
+          notes.push(`PTT 官方 Atom：${available}/${ptt.length} 個看板有近期文章；不含推文數。${indexed.length ? `${indexed.join("、")} 改由 Google 新聞索引補充，無法代表完整看板。` : ""}${missing.length ? `未取得：${missing.join("、")}。` : ""}${empty.length ? `近期無文章：${empty.join("、")}。` : ""}`);
+        }
+        const sourceStatus = Object.entries(currentData.source_status || {});
+        if (sourceStatus.length) {
+          const labels = {
+            GoogleTrends_TW: "Google Trends 台灣", "數位時代": "數位時代",
+            Threads_破圈代理: "Threads 新聞代理", Dcard_破圈代理: "Dcard 新聞代理",
+            財經投資代理: "財經新聞代理", PTT_Gossiping: "PTT Gossiping",
+            PTT_Stock: "PTT Stock", PTT_Lifeismoney: "PTT Lifeismoney",
+            YouTube_TW發燒: "YouTube 台灣發燒"
+          };
+          const list = document.getElementById("source-status-list");
+          list.replaceChildren();
+          for (const [name, info] of sourceStatus) {
+            const state = info?.state;
+            const count = Number(info?.count) || 0;
+            const description = state === "available" ? `採集 ${count} 則` :
+              state === "indexed" ? `Google 新聞索引補充 ${count} 則` :
+              state === "empty" ? "近期無符合條件資料" :
+              state === "not_configured" ? "未設定" : "未取得";
+            const row = document.createElement("li");
+            row.textContent = `${labels[name] || name}：${description}`;
+            list.appendChild(row);
+          }
+          document.getElementById("source-status").hidden = false;
         }
         if (notes.length) {
           const note = document.getElementById("data-note");
