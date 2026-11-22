@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [main, codex/complete-source-coverage]
+    branches: [main]
   schedule:
     - cron: '0 0,4,8,12 * * *'
   workflow_dispatch:
