@@ -1,0 +1,13 @@
+# 機密金鑰（絕對不可上傳）
+.env
+
+# Python 執行快取與虛擬環境
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 系統與編輯器暫存檔
+.DS_Store
+Thumbs.db

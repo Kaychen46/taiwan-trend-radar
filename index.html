@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台灣爆點雷達 | Coastal Morning</title>
+  <style>
+    :root {
+      --bg: #F2F2ED;
+      --surface: #FFFFFF;
+      --primary: #118AB2;
+      --primary-dark: #0B6482;
+      --primary-soft: #E6F4F8;
+      --accent: #7CD5C7;
+      --accent-dark: #0E5A4F;
+      --accent-soft: #E6F7F4;
+      --ink: #1A1D20;
+      --muted: #4A5560;
+      --border: #D8DDD6;
+      --sidebar-w: 320px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* 嚴格 16pt (21.33px) 基準字體設定 */
+    html {
+      font-size: 21.33px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      font-size: 1rem;
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    /* 整體雙欄佈局 */
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* 左側固定側邊欄 */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1.5px solid var(--border);
+      padding: 1.5rem 1.25rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      z-index: 20;
+    }
+
+    .brand-block {
+      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 1rem;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+    }
+
+    .brand-sub {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 0.2rem;
+    }
+
+    .meta-status {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-top: 0.6rem;
+      line-height: 1.5;
+    }
+
+    .sidebar-label {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--muted);
+      margin-bottom: 0.55rem;
+      display: block;
+    }
+
+    /* 決策視角切換器 */
+    .persona-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: var(--bg);
+      padding: 0.4rem;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+    }
+
+    .persona-btn {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.65rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    .persona-btn:hover {
+      background: rgba(17, 138, 178, 0.08);
+    }
+
+    .persona-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+
+    /* 垂直分類導覽 */
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1.5px solid transparent;
+      background: transparent;
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.6rem 0.85rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-btn:hover {
+      background: var(--bg);
+      border-color: var(--border);
+    }
+
+    .nav-btn.active {
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      border-color: var(--primary);
+      font-weight: 800;
+    }
+
+    .nav-count {
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--bg);
+      color: var(--muted);
+      padding: 0.1rem 0.55rem;
+      border-radius: 999px;
+    }
+
+    .nav-btn.active .nav-count {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+
+    /* 右側主內容區 */
+    .main-content {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 2rem 2.25rem 4rem;
+      max-width: calc(100% - var(--sidebar-w));
+    }
+
+    .content-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    /* 示範資料提示橫幅 */
+    .demo-banner {
+      display: none;
+      background: #FFF9E6;
+      border: 1.5px solid #E5C158;
+      color: #5C4300;
+      padding: 0.9rem 1.15rem;
+      border-radius: 12px;
+      margin-bottom: 1.75rem;
+      font-size: 1rem;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .demo-banner.show {
+      display: flex;
+    }
+
+    .dismiss-btn {
+      background: transparent;
+      border: 1.5px solid #C5A138;
+      color: #5C4300;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.2rem 0.65rem;
+      border-radius: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* 頭條 Hero 大卡 */
+    .hero-card {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-radius: 18px;
+      padding: 1.85rem;
+      margin-bottom: 1.85rem;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .hero-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 30px rgba(17, 138, 178, 0.22);
+    }
+
+    .hero-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .hero-badge-cat {
+      background: rgba(255, 255, 255, 0.18);
+      color: #FFFFFF;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.25rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .hero-badge-dh {
+      background: var(--accent);
+      color: var(--accent-dark);
+      font-size: 1rem;
+      font-weight: 800;
+      padding: 0.25rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .hero-card h2 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      line-height: 1.38;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero-tldr {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.92);
+      margin-bottom: 1.2rem;
+    }
+
+    .hero-persona-box {
+      background: rgba(255, 255, 255, 0.14);
+      border-left: 5px solid var(--accent);
+      padding: 0.9rem 1.1rem;
+      border-radius: 0 10px 10px 0;
+      margin-bottom: 1.25rem;
+      font-size: 1rem;
+    }
+
+    .hero-persona-box strong {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+
+    .hero-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      padding-top: 1rem;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    /* 雙欄卡片網格 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary);
+      box-shadow: 0 10px 24px rgba(17, 138, 178, 0.1);
+    }
+
+    .card-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .badge-cat {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      background: var(--primary-soft);
+      padding: 0.2rem 0.65rem;
+      border-radius: 8px;
+    }
+
+    .badge-dh {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--accent-dark);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent);
+      padding: 0.2rem 0.65rem;
+      border-radius: 8px;
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      line-height: 1.4;
+      margin-bottom: 0.65rem;
+      color: var(--ink);
+    }
+
+    .card-tldr {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 1.1rem;
+    }
+
+    .persona-box {
+      background: var(--bg);
+      border-left: 4px solid var(--primary);
+      padding: 0.8rem 0.95rem;
+      border-radius: 0 10px 10px 0;
+      font-size: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .persona-box strong {
+      display: block;
+      color: var(--primary-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .card-footer {
+      border-top: 1.5px solid var(--border);
+      padding-top: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .scores {
+      display: flex;
+      gap: 0.9rem;
+    }
+
+    .score-heat { color: var(--primary); }
+    .score-dh { color: var(--accent-dark); }
+    .cta-link { color: var(--ink); }
+
+    /* 右側寬版抽屜式 AI 報告 */
+    .drawer-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 29, 32, 0.48);
+      z-index: 40;
+    }
+
+    .drawer-backdrop.open {
+      display: block;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: -720px;
+      width: 100%;
+      max-width: 680px;
+      height: 100vh;
+      background: var(--surface);
+      z-index: 50;
+      padding: 2rem;
+      overflow-y: auto;
+      box-shadow: -10px 0 32px rgba(0, 0, 0, 0.18);
+      transition: right 0.25s ease;
+    }
+
+    .drawer.open {
+      right: 0;
+    }
+
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .close-btn {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      color: var(--ink);
+      font-size: 1.1rem;
+      font-weight: 800;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .report-section {
+      margin-bottom: 1.65rem;
+    }
+
+    .report-section h4 {
+      font-size: 1.08rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 0.55rem;
+    }
+
+    .playbook-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 0.9rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 0.7rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+
+    .copy-btn {
+      flex-shrink: 0;
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .source-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .source-link {
+      display: inline-block;
+      font-size: 1rem;
+      color: var(--primary-dark);
+      background: var(--primary-soft);
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .source-link:hover {
+      text-decoration: underline;
+    }
+
+    /* 響應式斷點 */
+    @media (max-width: 1080px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app-shell {
+        flex-direction: column;
+      }
+      .sidebar {
+        position: static;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1.5px solid var(--border);
+      }
+      .main-content {
+        margin-left: 0;
+        max-width: 100%;
+        padding: 1.5rem 1.25rem 3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 左側固定側邊欄 -->
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-title">📡 台灣爆點雷達</div>
+        <div class="brand-sub">TW Trend Radar</div>
+        <div class="meta-status" id="meta-info">資料載入中...</div>
+      </div>
+
+      <div>
+        <span class="sidebar-label">決策視角切換</span>
+        <div class="persona-group" role="group" aria-label="決策視角切換">
+          <button class="persona-btn active" data-persona="creator">🎬 創作者／行銷視角</button>
+          <button class="persona-btn" data-persona="ecommerce">🛒 電商／投資視角</button>
+        </div>
+      </div>
+
+      <div>
+        <span class="sidebar-label">情報領域篩選</span>
+        <nav class="nav-list" id="category-nav"></nav>
+      </div>
+    </aside>
+
+    <!-- 右側主內容區 -->
+    <main class="main-content">
+      <div class="content-inner">
+        <div class="demo-banner" id="demo-banner">
+          <div>
+            💡 目前顯示為<strong>內建示範資料</strong>。上線並執行 GitHub Actions 排程後，畫面會自動切換為 <code>data/latest_trends.json</code> 的每日真實台灣爆點情報。
+          </div>
+          <button class="dismiss-btn" id="dismiss-demo">隱藏</button>
+        </div>
+
+        <div id="hero-slot"></div>
+        <div class="grid" id="trend-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 右側抽屜式 AI 深度報告 -->
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="report-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <div id="drawer-badges" style="margin-bottom:0.6rem; display:flex; gap:0.5rem; flex-wrap:wrap;"></div>
+        <h2 id="drawer-title" style="font-size:1.35rem; font-weight:800; line-height:1.35;"></h2>
+      </div>
+      <button class="close-btn" id="close-drawer" aria-label="關閉">✕</button>
+    </div>
+    <div id="drawer-content"></div>
+  </aside>
+
+  <script>
+    const FALLBACK_DATA = {
+      updated_at: "2026-11-22 18:00（示範資料）",
+      total_signals_scanned: 65,
+      trends: [
+        {
+          topic_name: "超商冬季聯名熱飲爆紅：Threads 脆友實測「隱藏喝法」破百萬瀏覽",
+          category: "消費生活",
+          is_dark_horse: true,
+          heat_score: 94,
+          dark_horse_score: 97,
+          sources_involved: ["GoogleTrends_TW", "Threads_破圈代理"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "新品熱飲因網友分享加購鮮奶與肉桂粉的客製配方，引發全台門市掃貨潮。",
+          viral_dna: {
+            hook_type: "資訊落差＋低門檻跟風（銅板價升級感）",
+            why_now: "氣溫驟降觸發熱飲剛需，加上「店員才知道的隱藏點法」極具分享炫耀價值。"
+          },
+          creator_playbook: [
+            "短影音開頭：「別再照原價點了！超商這杯加 15 元直接變身精品咖啡廳水準」",
+            "圖文實測切角：一次橫評 3 種脆友推薦的隱藏比例，給出甜度與 CP 值紅黑榜"
+          ],
+          ecommerce_radar: "帶動家用奶泡機、肉桂粉與保溫隨行杯搜尋量上升；沖泡飲品電商可主打「在家 30 秒復刻超商爆款」。"
+        },
+        {
+          topic_name: "無咖啡因手搖飲大戰升溫：蕎麥茶與洋甘菊成上班族下午茶新寵",
+          category: "消費生活",
+          is_dark_horse: true,
+          heat_score: 85,
+          dark_horse_score: 88,
+          sources_involved: ["Dcard_破圈代理", "GoogleTrends_TW"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "越來越多上班族重視睡眠品質，帶動連鎖手搖飲紛紛推出無咖啡因機能茶飲。",
+          viral_dna: {
+            hook_type: "健康焦慮＋日常替代方案",
+            why_now: "年底加班壓力大，下午三點想喝飲料又怕晚上失眠成為最強共鳴點。"
+          },
+          creator_playbook: [
+            "清單型切角：「下午三點喝也不失眠！5 家連鎖手搖隱藏版無咖啡因神飲推薦」",
+            "盲測短影音：找失眠同事實測連續一週改喝無咖啡因茶飲的真實體感"
+          ],
+          ecommerce_radar: "冷泡蕎麥茶包、辦公室濾茶杯與助眠花草茶禮盒具備高回購潛力。"
+        },
+        {
+          topic_name: "日圓匯率震盪引爆冬季赴日掃貨潮：藥妝與家電必買清單大洗牌",
+          category: "消費生活",
+          is_dark_horse: false,
+          heat_score: 89,
+          dark_horse_score: 76,
+          sources_involved: ["PTT_Lifeismoney", "GoogleTrends_TW"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "年終旅遊旺季疊加匯率波動，社群瘋傳 2026 冬季日本最新免稅與高價差清單。",
+          viral_dna: {
+            hook_type: "省錢焦慮＋佔便宜心理",
+            why_now: "跨年與春節機票已訂妥，旅客正處於行前做功課與列購物清單的高峰期。"
+          },
+          creator_playbook: [
+            "避雷型切角：「2026 去日本別再買這 3 樣！台灣網購其實更便宜」",
+            "價差對比圖：直接列出日本原價 vs 台灣售價，把省下的機票錢視覺化"
+          ],
+          ecommerce_radar: "前開式行李箱、真空壓縮袋、eSIM 網卡與日本代購選品進入轉換高峰。"
+        },
+        {
+          topic_name: "AI 自動化工作流取代初階行政：中小企業主與上班族兩極論戰",
+          category: "商業科技",
+          is_dark_horse: true,
+          heat_score: 91,
+          dark_horse_score: 93,
+          sources_involved: ["數位時代", "Dcard_破圈代理"],
+          reference_urls: ["https://www.bnext.com.tw/"],
+          tldr: "一篇分享用免費 AI 工具把週報時間從 4 小時縮成 10 分鐘的貼文，引爆職場焦慮。",
+          viral_dna: {
+            hook_type: "職場焦慮＋極致省時反差",
+            why_now: "年底考績與年度結案潮將近，上班族對「準時下班」與「不可替代性」最敏感。"
+          },
+          creator_playbook: [
+            "教學型切角：「老闆不會告訴你的事：年底結案用這 3 個免費 AI 流程，省下 80% 加班時間」",
+            "觀點型切角：拆解哪些行政工作最容易被取代，以及如何轉型成「指揮 AI 的人」"
+          ],
+          ecommerce_radar: "Notion 模板、自動化教學課、Prompt 懶人包與高效辦公周邊（雙螢幕支架）轉換率極佳。"
+        },
+        {
+          topic_name: "台灣獨立遊戲 Steam 爆紅：小團隊靠「在地夜市文化」衝上全球熱銷",
+          category: "商業科技",
+          is_dark_horse: true,
+          heat_score: 86,
+          dark_horse_score: 91,
+          sources_involved: ["YouTube_TW發燒", "PTT_Gossiping"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "一款融合台灣夜市經營與奇幻元素的獨立遊戲獲海外實況主大推，討論度暴衝。",
+          viral_dna: {
+            hook_type: "在地榮譽感＋反差驚喜",
+            why_now: "國際大作頻傳災情，玩家轉向支持創意十足且價格親民的獨立遊戲。"
+          },
+          creator_playbook: [
+            "幕後拆解：「只有 3 個人的台灣團隊，怎麼靠夜市題材打進 Steam 全球熱銷榜？」",
+            "彩蛋整理：盤點遊戲裡只有台灣人才看得懂的 10 個超神在地細節"
+          ],
+          ecommerce_radar: "電競手把、Steam Deck 周邊配件與聯名文創商品可順勢切入玩家社群。"
+        },
+        {
+          topic_name: "中小品牌導入短影音導購失敗案例：燒錢買流量卻零轉單的 3 大盲點",
+          category: "商業科技",
+          is_dark_horse: false,
+          heat_score: 80,
+          dark_horse_score: 79,
+          sources_involved: ["數位時代", "Threads_破圈代理"],
+          reference_urls: ["https://www.bnext.com.tw/"],
+          tldr: "行銷圈熱議「高觀看不等於高轉換」，點出過度追求娛樂梗卻沒接住購買意圖的通病。",
+          viral_dna: {
+            hook_type: "專業痛點＋反常識拆解",
+            why_now: "雙 11 剛結束，各大品牌正在復盤廣告 ROAS 與短影音投入產出比。"
+          },
+          creator_playbook: [
+            "案例復盤：「為什麼你的短影音破十萬觀看卻賣不動？拆解 3 個最致命的導購斷點」",
+            "公式分享：高轉換帶貨腳本的黃金 15 秒結構（痛點→展示→信任背書）"
+          ],
+          ecommerce_radar: "顧問診斷服務、短影音腳本模板與輕量補光收音設備需求持續攀升。"
+        },
+        {
+          topic_name: "「微獨居美學」在年輕族群爆紅：10 坪租屋處改造影片狂吸收藏",
+          category: "社群文化",
+          is_dark_horse: true,
+          heat_score: 88,
+          dark_horse_score: 90,
+          sources_involved: ["Threads_破圈代理", "YouTube_TW發燒"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "不買房也能過得講究！免釘牆、可帶走的軟裝改造影片成為社群最高收藏率題材。",
+          viral_dna: {
+            hook_type: "生活掌控感＋視覺療癒反差",
+            why_now: "高房價壓力下，年輕人將預算轉向提升租屋處的日常幸福感與情緒價值。"
+          },
+          creator_playbook: [
+            "改造前後對比：「預算 3000 元不傷牆面！把老舊套房改造成咖啡廳質感」",
+            "好物清單：精選 5 樣退租時可以輕鬆帶走的高顏值收納神器"
+          ],
+          ecommerce_radar: "免釘置物架、暖光落地燈、摺疊收納箱與香氛蠟燭為最直接受惠選品。"
+        },
+        {
+          topic_name: "職場「準時下班不社交」成新顯學：Z 世代工作界線宣言引爆世代對話",
+          category: "社群文化",
+          is_dark_horse: false,
+          heat_score: 87,
+          dark_horse_score: 78,
+          sources_involved: ["Dcard_破圈代理", "Threads_破圈代理"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "從拒絕無意義尾牙表演到下班不回群組訊息，社群熱烈討論健康職場邊界。",
+          viral_dna: {
+            hook_type: "世代立場衝突＋情緒宣洩共鳴",
+            why_now: "年底尾牙與部門聚餐季開跑，職場社交壓力正式進入高峰。"
+          },
+          creator_playbook: [
+            "情境短劇：演繹「高情商婉拒下班聚餐」的 3 種超實用話術",
+            "投票互動：設計職場界線測驗，引導留言區展開跨世代討論拉高互動率"
+          ],
+          ecommerce_radar: "居家放鬆好物（按摩儀、泡澡球）、單人小家電與職場溝通書籍受歡迎。"
+        },
+        {
+          topic_name: "「報復性早睡」挑戰在社群蔓延：從熬夜滑手機轉向極簡晚間儀式",
+          category: "社群文化",
+          is_dark_horse: true,
+          heat_score: 82,
+          dark_horse_score: 86,
+          sources_involved: ["Threads_破圈代理", "GoogleTrends_TW"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "越來越多創作者發起 23:00 關機打卡挑戰，把「睡飽」重新定義為高級自律。",
+          viral_dna: {
+            hook_type: "自律焦慮＋身分認同升級",
+            why_now: "冬季日照短、體感疲勞加重，加上年底身心耗竭，大眾渴望低成本的修復方案。"
+          },
+          creator_playbook: [
+            "打卡企劃：「連續 14 天 11 點睡覺，我的皮膚與專注力發生了什麼變化？」",
+            "儀式感清單：睡前 30 分鐘不滑手機可以做的 4 件超舒壓小事"
+          ],
+          ecommerce_radar: "遮光眼罩、重力被、白噪音機與舒眠精油進入冬季熱銷期。"
+        },
+        {
+          topic_name: "高股息 ETF 配息縮水引爆換股潮：小資族轉向市值型與債券配置",
+          category: "財經投資",
+          is_dark_horse: false,
+          heat_score: 92,
+          dark_horse_score: 75,
+          sources_involved: ["PTT_Stock", "GoogleTrends_TW"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "多檔熱門高股息 ETF 最新配息不如預期，社群掀起「該續抱還是換股」的激烈討論。",
+          viral_dna: {
+            hook_type: "損失規避＋被動收入焦慮",
+            why_now: "除息公告週期疊加年底資金重新配置，散戶急需明確的決策依據。"
+          },
+          creator_playbook: [
+            "數據視覺化切角：一張表看懂近四季配息變化，計算「領息卻貼息」的真實報酬率",
+            "反直覺標題：「配息變少反而是好事？3 個指標判斷你的 ETF 該留還是該砍」"
+          ],
+          ecommerce_radar: "理財記帳 App、投資書籍與財經訂閱專欄的導購黃金期，適合切入年度資產健檢。"
+        },
+        {
+          topic_name: "AI 伺服器供應鏈法說會釋出新展望：散熱與電源管理成台股討論焦點",
+          category: "財經投資",
+          is_dark_horse: true,
+          heat_score: 89,
+          dark_horse_score: 87,
+          sources_involved: ["PTT_Stock", "數位時代"],
+          reference_urls: ["https://www.bnext.com.tw/"],
+          tldr: "隨新一代算力架構功耗提升，水冷散熱與高階電源族群成為法人與散戶雙重焦點。",
+          viral_dna: {
+            hook_type: "趨勢紅利＋怕錯過心理 (FOMO)",
+            why_now: "第四季財報與明年資本支出指引陸續揭曉，市場正在尋找下一波領漲主線。"
+          },
+          creator_playbook: [
+            "白話科普：「3 分鐘看懂為什麼 AI 越強，散熱跟電力股反而越賺錢」",
+            "產業鏈地圖：整理台灣供應鏈上中下游關鍵角色，做成高收藏懶人包"
+          ],
+          ecommerce_radar: "財經數據工具訂閱、產業研究電子報與投資人進修課程具備高度精準受眾。"
+        },
+        {
+          topic_name: "年底節稅與信用卡權益大縮水攻略：PTT 省錢版熱議 2027 神卡接班人",
+          category: "財經投資",
+          is_dark_horse: true,
+          heat_score: 84,
+          dark_horse_score: 89,
+          sources_involved: ["PTT_Lifeismoney", "Dcard_破圈代理"],
+          reference_urls: ["https://trends.google.com/trending?geo=TW"],
+          tldr: "多家銀行搶先預告明年度回饋調整，小資族開始盤點無腦刷神卡與點數折抵攻略。",
+          viral_dna: {
+            hook_type: "權益剝奪感＋實用攻略剛需",
+            why_now: "每年 11–12 月是銀行公告隔年權益的關鍵窗口，搜尋與轉發意願極高。"
+          },
+          creator_playbook: [
+            "懶人對照表：「2027 信用卡大洗牌！這 3 張確定縮水，改辦這 2 張回饋最高」",
+            "分類推薦：針對網購族、海外旅遊族、超商通勤族各給出一張主力卡建議"
+          ],
+          ecommerce_radar: "金融聯盟行銷（辦卡導流）、理財記帳工具與高回饋行動支付教學流量極高。"
+        }
+      ]
+    };
+
+    const CATEGORIES = [
+      { key: "ALL", label: "全部情報" },
+      { key: "DARK_HORSE", label: "🐎 只看黑馬飆升" },
+      { key: "消費生活", label: "消費生活" },
+      { key: "商業科技", label: "商業科技" },
+      { key: "社群文化", label: "社群文化" },
+      { key: "財經投資", label: "財經投資" }
+    ];
+
+    let currentData = null;
+    let currentPersona = "creator";
+    let currentFilter = "ALL";
+    let activePlaybooks = [];
+
+    async function loadTrends() {
+      try {
+        const res = await fetch("./data/latest_trends.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("No live JSON");
+        const parsed = await res.json();
+        if (!parsed.trends || !parsed.trends.length) throw new Error("Empty JSON");
+        currentData = parsed;
+      } catch (err) {
+        currentData = FALLBACK_DATA;
+        document.getElementById("demo-banner").classList.add("show");
+      }
+
+      document.getElementById("meta-info").textContent =
+        `更新：${currentData.updated_at} ｜ 掃描 ${currentData.total_signals_scanned} 則訊號`;
+
+      renderNav();
+      renderView();
+    }
+
+    function getFilteredTrends() {
+      const all = currentData?.trends || [];
+      return all.filter(item => {
+        if (currentFilter === "ALL") return true;
+        if (currentFilter === "DARK_HORSE") return Boolean(item.is_dark_horse);
+        return item.category === currentFilter;
+      });
+    }
+
+    function countForCategory(key) {
+      const all = currentData?.trends || [];
+      if (key === "ALL") return all.length;
+      if (key === "DARK_HORSE") return all.filter(t => t.is_dark_horse).length;
+      return all.filter(t => t.category === key).length;
+    }
+
+    function renderNav() {
+      const nav = document.getElementById("category-nav");
+      nav.innerHTML = CATEGORIES.map(cat => `
+        <button class="nav-btn ${currentFilter === cat.key ? "active" : ""}" data-cat="${cat.key}">
+          <span>${cat.label}</span>
+          <span class="nav-count">${countForCategory(cat.key)}</span>
+        </button>
+      `).join("");
+
+      nav.querySelectorAll(".nav-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          currentFilter = btn.dataset.cat;
+          renderNav();
+          renderView();
+        });
+      });
+    }
+
+    function renderView() {
+      const items = getFilteredTrends();
+      const heroSlot = document.getElementById("hero-slot");
+      const grid = document.getElementById("trend-grid");
+
+      if (!items.length) {
+        heroSlot.innerHTML = "";
+        grid.innerHTML = `<p style="color:var(--muted);">此分類目前沒有符合門檻的爆點話題。</p>`;
+        return;
+      }
+
+      const [hero, ...rest] = items;
+      const heroIndex = currentData.trends.indexOf(hero);
+      const personaTitle = currentPersona === "creator" ? "🎬 創作者可直接套用切角" : "🛒 電商／商業風向雷達";
+      const heroPersonaText = currentPersona === "creator"
+        ? (hero.creator_playbook?.[0] || "點擊查看完整切角")
+        : (hero.ecommerce_radar || "點擊查看商業分析");
+
+      heroSlot.innerHTML = `
+        <article class="hero-card" onclick="openDrawer(${heroIndex})">
+          <div class="hero-top">
+            <span class="hero-badge-cat">🏆 本期焦點 · ${hero.category}</span>
+            ${hero.is_dark_horse ? `<span class="hero-badge-dh">🐎 黑馬飆升</span>` : ``}
+          </div>
+          <h2>${hero.topic_name}</h2>
+          <p class="hero-tldr">${hero.tldr}</p>
+          <div class="hero-persona-box">
+            <strong>${personaTitle}</strong>
+            <span>${heroPersonaText}</span>
+          </div>
+          <div class="hero-footer">
+            <span>🔥 熱度 ${hero.heat_score} ｜ ⚡ 黑馬 ${hero.dark_horse_score}</span>
+            <span>閱讀 AI 完整拆解報告 →</span>
+          </div>
+        </article>
+      `;
+
+      grid.innerHTML = rest.map(item => {
+        const idx = currentData.trends.indexOf(item);
+        const personaText = currentPersona === "creator"
+          ? (item.creator_playbook?.[0] || "點擊查看完整切角")
+          : (item.ecommerce_radar || "點擊查看商業分析");
+
+        return `
+          <article class="card" onclick="openDrawer(${idx})">
+            <div>
+              <div class="card-top">
+                <span class="badge-cat">${item.category}</span>
+                ${item.is_dark_horse ? `<span class="badge-dh">🐎 黑馬</span>` : ``}
+              </div>
+              <h3>${item.topic_name}</h3>
+              <p class="card-tldr">${item.tldr}</p>
+              <div class="persona-box">
+                <strong>${personaTitle}</strong>
+                <span>${personaText}</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="scores">
+                <span class="score-heat">🔥 ${item.heat_score}</span>
+                <span class="score-dh">⚡ ${item.dark_horse_score}</span>
+              </div>
+              <span class="cta-link">拆解報告 →</span>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function openDrawer(index) {
+      const item = currentData.trends[index];
+      if (!item) return;
+
+      activePlaybooks = item.creator_playbook || [];
+
+      document.getElementById("drawer-badges").innerHTML = `
+        <span class="badge-cat">${item.category}</span>
+        ${item.is_dark_horse ? `<span class="badge-dh">🐎 黑馬飆升</span>` : ""}
+      `;
+      document.getElementById("drawer-title").textContent = item.topic_name;
+
+      const playbooksHtml = activePlaybooks.map((text, i) => `
+        <div class="playbook-item">
+          <span>${text}</span>
+          <button class="copy-btn" onclick="copyPlaybook(this, ${i})">複製</button>
+        </div>
+      `).join("");
+
+      const sourcesHtml = (item.reference_urls || []).map((url, i) => `
+        <a class="source-link" href="${url}" target="_blank" rel="noopener noreferrer">
+          ↗ ${item.sources_involved?.[i] || `原始來源 ${i + 1}`}
+        </a>
+      `).join("");
+
+      document.getElementById("drawer-content").innerHTML = `
+        <div class="report-section">
+          <h4>📌 30 秒事件脈絡 (TL;DR)</h4>
+          <p>${item.tldr}</p>
+        </div>
+        <div class="report-section">
+          <h4>🧬 AI 爆紅基因拆解</h4>
+          <p><strong>情緒鉤子：</strong>${item.viral_dna?.hook_type || "-"}</p>
+          <p style="margin-top:0.5rem;"><strong>為何是現在：</strong>${item.viral_dna?.why_now || "-"}</p>
+        </div>
+        <div class="report-section">
+          <h4>🎬 創作者／行銷人可複製切角</h4>
+          ${playbooksHtml}
+        </div>
+        <div class="report-section">
+          <h4>🛒 電商選品與商業風向</h4>
+          <p>${item.ecommerce_radar || "-"}</p>
+        </div>
+        <div class="report-section">
+          <h4>🔗 跨平台訊號來源（合規導流）</h4>
+          <div class="source-list">${sourcesHtml}</div>
+        </div>
+      `;
+
+      document.getElementById("drawer-backdrop").classList.add("open");
+      document.getElementById("report-drawer").classList.add("open");
+    }
+
+    function closeDrawer() {
+      document.getElementById("drawer-backdrop").classList.remove("open");
+      document.getElementById("report-drawer").classList.remove("open");
+    }
+
+    function copyPlaybook(btn, idx) {
+      const text = activePlaybooks[idx] || "";
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = "已複製 ✓";
+        setTimeout(() => btn.textContent = original, 1500);
+      });
+    }
+
+    document.querySelectorAll(".persona-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".persona-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentPersona = btn.dataset.persona;
+        renderView();
+      });
+    });
+
+    document.getElementById("close-drawer").addEventListener("click", closeDrawer);
+    document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
+    document.getElementById("dismiss-demo").addEventListener("click", () => {
+      document.getElementById("demo-banner").classList.remove("show");
+    });
+
+    loadTrends();
+  </script>
+</body>
+</html>
