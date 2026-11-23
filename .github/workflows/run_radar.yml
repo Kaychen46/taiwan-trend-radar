@@ -5,7 +5,7 @@ on:
     branches: [main]
   schedule:
     - cron: '17 7 * * *' # 15:17 Asia/Taipei
-    - cron: '12 15 23 11 *' # Temporary schedule check: 2026-11-23 23:12 Asia/Taipei
+    - cron: '*/5 * * * *' # Temporary dispatch probe; remove after verification
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  schedule-probe:
+    if: github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Scheduled event dispatched at $(date -u)"
   run-pipeline:
+    if: github.event.schedule != '*/5 * * * *'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
