@@ -922,8 +922,8 @@
       if (!isDemo) {
         const notes = ["AI 分析根據公開標題產生，請開啟原始來源核對細節。"];
         const updated = new Date(String(currentData.updated_at).replace(" ", "T") + "+08:00");
-        if (!Number.isFinite(updated.getTime()) || Date.now() - updated.getTime() > 12 * 60 * 60 * 1000) {
-          notes.push("資料已超過 12 小時未更新，請留意時效。 ");
+        if (!Number.isFinite(updated.getTime()) || Date.now() - updated.getTime() > 26 * 60 * 60 * 1000) {
+          notes.push("資料已超過 26 小時未更新，請留意時效。 ");
         }
         const ptt = Object.entries(currentData.ptt_status || {});
         if (ptt.length) {
