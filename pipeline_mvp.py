@@ -44,6 +44,7 @@ client = OpenAI(
 )
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
 LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "gemini-3.1-flash-lite")
+LLM_LAST_RESORT_MODEL = os.getenv("LLM_LAST_RESORT_MODEL", "gemini-3.8-flash")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
@@ -262,11 +263,12 @@ reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或�
 事件脈絡只根據輸入標題撰寫；標題沒有提供的數字、價格、政策細節或醫療結論，不得當成已確認事實。
 """
     models = [LLM_MODEL]
-    if LLM_FALLBACK_MODEL and LLM_FALLBACK_MODEL != LLM_MODEL:
-        models.append(LLM_FALLBACK_MODEL)
+    for backup in (LLM_FALLBACK_MODEL, LLM_LAST_RESORT_MODEL):
+        if backup and backup not in models:
+            models.append(backup)
 
     for model in models:
-        max_attempts = 4 if model == LLM_MODEL else 2
+        max_attempts = 2
         for attempt in range(max_attempts):
             try:
                 response = client.chat.completions.create(
