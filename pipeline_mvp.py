@@ -1,13 +1,14 @@
 import os
 import json
 import re
+import time
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from calendar import timegm
 import feedparser
 import requests
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, APIConnectionError, APIStatusError
 
 load_dotenv()
 
@@ -37,7 +38,9 @@ RSS_SOURCES = [
 
 client = OpenAI(
     api_key=os.getenv("LLM_API_KEY"),
-    base_url=os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+    base_url=os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"),
+    max_retries=0,
+    timeout=90.0,
 )
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
@@ -257,15 +260,25 @@ def analyze_trends_with_ai(signals: list[dict]) -> dict:
 reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或使用網站首頁。沒有來源連結的話題不要輸出。
 事件脈絡只根據輸入標題撰寫；標題沒有提供的數字、價格、政策細節或醫療結論，不得當成已確認事實。
 """
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        response_format={"type": "json_object"},
-        temperature=0.3,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": json.dumps(signals, ensure_ascii=False)}
-        ]
-    )
+    for attempt in range(4):
+        try:
+            response = client.chat.completions.create(
+                model=LLM_MODEL,
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(signals, ensure_ascii=False)}
+                ]
+            )
+            break
+        except (APIConnectionError, APIStatusError) as exc:
+            retryable = isinstance(exc, APIConnectionError) or exc.status_code in (408, 500, 502, 503, 504)
+            if not retryable or attempt == 3:
+                raise
+            delay = 15 * 2 ** attempt
+            print(f"[Warning] Gemini 暫時無法連線，第 {attempt + 1} 次失敗；{delay} 秒後重試。")
+            time.sleep(delay)
     cleaned = clean_json_text(response.choices[0].message.content)
     return json.loads(cleaned)
 
