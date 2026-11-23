@@ -43,6 +43,7 @@ client = OpenAI(
     timeout=90.0,
 )
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "gemini-3.1-flash-lite")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
@@ -222,7 +223,7 @@ def clean_json_text(raw: str) -> str:
     return raw
 
 
-def analyze_trends_with_ai(signals: list[dict]) -> dict:
+def analyze_trends_with_ai(signals: list[dict]) -> tuple[dict, str]:
     system_prompt = f"""
 你是一位頂尖的「台灣流量操盤手兼電商選品總監」。
 我會提供台灣近 36 小時來自搜尋趨勢、商業媒體、PTT 近期文章、YouTube 發燒與社群破圈的公開標題清單。
@@ -260,28 +261,37 @@ def analyze_trends_with_ai(signals: list[dict]) -> dict:
 reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或使用網站首頁。沒有來源連結的話題不要輸出。
 事件脈絡只根據輸入標題撰寫；標題沒有提供的數字、價格、政策細節或醫療結論，不得當成已確認事實。
 """
-    for attempt in range(4):
-        try:
-            response = client.chat.completions.create(
-                model=LLM_MODEL,
-                response_format={"type": "json_object"},
-                temperature=0.3,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": json.dumps(signals, ensure_ascii=False)}
-                ]
-            )
-            break
-        except (APIConnectionError, APIStatusError) as exc:
-            retryable = isinstance(exc, APIConnectionError) or exc.status_code in (408, 500, 502, 503, 504)
-            if not retryable or attempt == 3:
-                raise
-            delay = 15 * 2 ** attempt
-            print(f"[Warning] Gemini 暫時無法連線，第 {attempt + 1} 次失敗；{delay} 秒後重試。")
-            time.sleep(delay)
-    cleaned = clean_json_text(response.choices[0].message.content)
-    return json.loads(cleaned)
+    models = [LLM_MODEL]
+    if LLM_FALLBACK_MODEL and LLM_FALLBACK_MODEL != LLM_MODEL:
+        models.append(LLM_FALLBACK_MODEL)
 
+    for model in models:
+        max_attempts = 4 if model == LLM_MODEL else 2
+        for attempt in range(max_attempts):
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(signals, ensure_ascii=False)}
+                    ]
+                )
+                cleaned = clean_json_text(response.choices[0].message.content)
+                return json.loads(cleaned), model
+            except (APIConnectionError, APIStatusError) as exc:
+                retryable = isinstance(exc, APIConnectionError) or exc.status_code in (408, 500, 502, 503, 504)
+                if not retryable:
+                    raise
+                if attempt == max_attempts - 1:
+                    if model == models[-1]:
+                        raise
+                    print(f"[Warning] Gemini {model} 持續無法連線，改用 {models[-1]}。", flush=True)
+                    break
+                delay = 15 * 2 ** attempt
+                print(f"[Warning] Gemini {model} 暫時無法連線，第 {attempt + 1} 次失敗；{delay} 秒後重試。", flush=True)
+                time.sleep(delay)
 
 def send_webhook(message: str):
     if not WEBHOOK_URL:
@@ -346,13 +356,14 @@ def main():
             raise ValueError("未抓取到任何有效訊號，請檢查網路連線。")
 
         print(f"成功採集 {len(signals)} 則跨平台訊號，送入 Gemini 情報引擎...")
-        result = analyze_trends_with_ai(signals)
+        result, analysis_model = analyze_trends_with_ai(signals)
         reports = verified_reports(result.get("trends", []), signals)
         if not reports:
             raise ValueError("AI 未產生任何附有可核對來源的報告。")
 
         output_payload = {
             "updated_at": now_str,
+            "analysis_model": analysis_model,
             "total_signals_scanned": len(signals),
             "ptt_status": ptt_status,
             "source_status": source_status,
