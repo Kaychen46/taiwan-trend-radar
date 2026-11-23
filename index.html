@@ -588,7 +588,7 @@
         <div class="meta-status" id="meta-info">資料載入中...</div>
       </div>
 
-      <div>
+      <div id="persona-controls">
         <span class="sidebar-label">決策視角切換</span>
         <div class="persona-group" role="group" aria-label="決策視角切換">
           <button class="persona-btn active" data-persona="creator">🎬 創作者／行銷視角</button>
@@ -907,7 +907,9 @@
         const res = await fetch("./data/latest_trends.json", { cache: "no-store" });
         if (!res.ok) throw new Error("No live JSON");
         const parsed = await res.json();
-        if (!Array.isArray(parsed.trends) || !parsed.trends.length) throw new Error("Empty JSON");
+        const hasReports = Array.isArray(parsed.trends) && parsed.trends.length > 0;
+        const hasSources = parsed.analysis_status === "source_only" && Array.isArray(parsed.raw_signals) && parsed.raw_signals.length > 0;
+        if (!hasReports && !hasSources) throw new Error("Empty JSON");
         currentData = parsed;
       } catch (err) {
         currentData = FALLBACK_DATA;
@@ -915,12 +917,16 @@
         document.getElementById("demo-banner").classList.add("show");
       }
 
+      const sourceOnly = !isDemo && currentData.analysis_status === "source_only";
+      document.getElementById("persona-controls").hidden = sourceOnly;
       document.getElementById("meta-info").textContent =
         isDemo ? "示範資料｜未掃描真實訊號" :
-        `更新：${currentData.updated_at}（台灣時間）｜掃描 ${currentData.total_signals_scanned} 則訊號`;
+        `${sourceOnly ? "來源更新" : "分析更新"}：${currentData.updated_at}（台灣時間）｜掃描 ${currentData.total_signals_scanned} 則訊號`;
 
       if (!isDemo) {
-        const notes = ["AI 分析根據公開標題產生，請開啟原始來源核對細節。"];
+        const notes = sourceOnly
+          ? ["Gemini 暫時無法提供分析；本次只顯示近 36 小時採集到的原始來源標題，沒有 AI 排名、分數或商業解讀。"]
+          : ["AI 分析根據公開標題產生，請開啟原始來源核對細節。"];
         const updated = new Date(String(currentData.updated_at).replace(" ", "T") + "+08:00");
         if (!Number.isFinite(updated.getTime()) || Date.now() - updated.getTime() > 26 * 60 * 60 * 1000) {
           notes.push("資料已超過 26 小時未更新，請留意時效。 ");
@@ -969,6 +975,7 @@
     }
 
     function getFilteredTrends() {
+      if (currentData?.analysis_status === "source_only") return currentData.raw_signals || [];
       const all = currentData?.trends || [];
       return all.filter(item => {
         if (currentFilter === "ALL") return true;
@@ -986,6 +993,10 @@
 
     function renderNav() {
       const nav = document.getElementById("category-nav");
+      if (currentData?.analysis_status === "source_only") {
+        nav.innerHTML = `<div class="nav-btn active"><span>原始來源</span><span class="nav-count">${currentData.raw_signals.length}</span></div>`;
+        return;
+      }
       nav.innerHTML = CATEGORIES.map(cat => `
         <button class="nav-btn ${currentFilter === cat.key ? "active" : ""}" data-cat="${cat.key}">
           <span>${cat.label}</span>
@@ -1010,6 +1021,22 @@
       if (!items.length) {
         heroSlot.innerHTML = "";
         grid.innerHTML = `<p style="color:var(--muted);">此分類目前沒有符合門檻的爆點話題。</p>`;
+        return;
+      }
+
+      if (currentData?.analysis_status === "source_only") {
+        heroSlot.innerHTML = "";
+        grid.innerHTML = items.map(item => {
+          const sourceUrl = safeSourceUrl(item.url);
+          return `<article class="card">
+            <div>
+              <div class="card-top"><span class="badge-cat">${escapeHtml(item.source)}</span></div>
+              <h3>${escapeHtml(item.title)}</h3>
+              <p class="card-tldr">${escapeHtml(item.metric || "原始來源標題")}</p>
+            </div>
+            <div class="card-footer">${sourceUrl ? `<a class="cta-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">開啟原始來源 ↗</a>` : "來源連結不可用"}</div>
+          </article>`;
+        }).join("");
         return;
       }
 
