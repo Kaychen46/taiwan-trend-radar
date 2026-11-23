@@ -1,6 +1,6 @@
 # 台灣爆點雷達
 
-這是靜態網站。GitHub Actions 每天在台灣時間 15:00 執行資料管線，產出 `data/latest_trends.json`，並將當次的 `index.html` 與 JSON 一起發布到 GitHub Pages。排程以 UTC 07:00 設定，實際執行可能延遲；GitHub 說明見 [排程事件文件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。設定寄件憑證後，網站部署成功時工作流程會寄出一封更新通知信。
+這是靜態網站。GitHub Actions 每天在台灣時間 15:00 執行資料管線，產出 `data/latest_trends.json`，並將當次的 `index.html` 與 JSON 一起發布到 GitHub Pages。排程以 UTC 07:00 設定，實際執行可能延遲；GitHub 說明見 [排程事件文件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
 
 ## 資料與標示
 
@@ -14,7 +14,6 @@
 
 1. 在儲存庫 Settings → Pages，將 **Build and deployment → Source** 設為 **GitHub Actions**。此設定方法見 [GitHub Pages 發布來源文件](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)。
 2. 在儲存庫 Actions secrets 設定 `LLM_API_KEY`（Gemini API key）。`YOUTUBE_API_KEY` 與 `DISCORD_WEBHOOK_URL` 是選用項目。不要把金鑰寫入原始碼或 issue。Gemini 模型與相容 API 依 [Google Gemini 文件](https://ai.google.dev/gemini-api/docs) 設定。
-3. 若要在每次成功部署後寄送通知，還須設定三個 Actions secrets：`SMTP_USERNAME`（寄件 Gmail 地址）、`SMTP_APP_PASSWORD`（該帳號的 Google 應用程式密碼）和 `NOTIFY_EMAIL`（收件地址）。[Google 說明](https://support.google.com/accounts/answer/185833/sign-in-with-app-passwords)指出，建立應用程式密碼需要先啟用兩步驟驗證；請勿使用一般帳號密碼。
-4. 更新 `main`、排程到時或手動啟動時，**Taiwan Trend Radar Pipeline** 都會執行。確認 `run-pipeline`、`deploy-pages` 與 `notify-success` 都成功，再開啟 Pages 網址核對資料與來源。Pages 自訂工作流程所需的 artifact、權限與環境設定見 [GitHub 官方範例](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+3. 更新 `main`、排程到時或手動啟動時，**Taiwan Trend Radar Pipeline** 都會執行。確認 `run-pipeline` 與 `deploy-pages` 都成功，再開啟 Pages 網址核對資料與來源。Pages 自訂工作流程所需的 artifact、權限與環境設定見 [GitHub 官方範例](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
 
-排程或手動執行失敗時，既有 Pages 部署不會自動消失；網站會保留上次成功發布的 JSON，並在超過 26 小時時顯示過期提示。若部署成功但寄信失敗，網站仍會維持新資料；請查看 `notify-success` 工作的錯誤訊息。
+排程或手動執行失敗時，既有 Pages 部署不會自動消失；網站會保留上次成功發布的 JSON，並在超過 26 小時時顯示過期提示。
