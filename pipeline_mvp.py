@@ -267,7 +267,7 @@ reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或�
         if backup and backup not in models:
             models.append(backup)
 
-    for model in models:
+    for model_index, model in enumerate(models):
         max_attempts = 2
         for attempt in range(max_attempts):
             try:
@@ -287,9 +287,9 @@ reference_urls 必須逐字複製輸入訊號的 url，不得編造、改寫或�
                 if not retryable:
                     raise
                 if attempt == max_attempts - 1:
-                    if model == models[-1]:
+                    if model_index == len(models) - 1:
                         raise
-                    print(f"[Warning] Gemini {model} 持續無法連線，改用 {models[-1]}。", flush=True)
+                    print(f"[Warning] Gemini {model} 持續無法連線，改用 {models[model_index + 1]}。", flush=True)
                     break
                 delay = 15 * 2 ** attempt
                 print(f"[Warning] Gemini {model} 暫時無法連線，第 {attempt + 1} 次失敗；{delay} 秒後重試。", flush=True)

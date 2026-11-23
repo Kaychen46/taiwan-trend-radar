@@ -1,6 +1,6 @@
 # 台灣爆點雷達
 
-這是靜態網站。GitHub Actions 每天在台灣時間 15:00 執行資料管線，產出 `data/latest_trends.json`，並將當次的 `index.html` 與 JSON 一起發布到 GitHub Pages。排程以 UTC 07:00 設定，實際執行可能延遲；GitHub 說明見 [排程事件文件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
+這是靜態網站。GitHub Actions 每天在台灣時間 15:17 執行資料管線，產出 `data/latest_trends.json`，並將當次的 `index.html` 與 JSON 一起發布到 GitHub Pages。排程以 UTC 07:17 設定，避開整點高負載；GitHub 排程仍可能延遲或漏掉，詳見 [排程事件文件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
 
 ## 資料與標示
 
@@ -8,7 +8,8 @@
 - PTT 優先使用 [看板 Atom 摘要](https://www.ptt.cc/bbs/PttNewhand/M.1588097847.A.41D.html)取得近期文章。Stock 的官方 Atom 與看板頁面曾在 [GitHub runner 檢查](https://github.com/Kaychen46/taiwan-trend-radar/actions/runs/45035395520)回傳 403；只有直取失敗時，才從 [Google 新聞的 PTT Stock 搜尋摘要](https://news.google.com/rss/search?q=site%3Aptt.cc%2Fbbs%2FStock%20when%3A1d&hl=zh-TW&gl=TW&ceid=TW%3Azh-Hant)選取近期且明確標為 Stock 看板的標題。這是索引補充，連結會先到 Google 新聞，不能代表完整看板或原始標題全文。Atom 與索引都不提供推文數。
 - JSON 的 `ptt_status` 區分官方直取 `available`、索引補充 `indexed`、近期無文章 `empty`、未取得 `unavailable`。`source_status` 記錄各來源在過濾後的採集數量，以及 `available`、`indexed`、`empty`、`unavailable` 或選用來源未設定的 `not_configured` 狀態；網站的「來源採集明細」會顯示這些狀態。採集數量可能高於實際送入模型的 65 則上限；上限見 [管線設定](https://github.com/Kaychen46/taiwan-trend-radar/blob/main/pipeline_mvp.py)。
 - 只採用有可解析發布時間且在 36 小時內的 RSS／PTT 文章。模型輸出的來源網址必須與採集訊號的網址相同；沒有可核對來源的報告不發布。報告也會列出當時採集到的來源標題，方便核對 AI 摘要。
-- 若 JSON 不存在或沒有報告，網站顯示固定的示範內容與不可隱藏的示範標籤。示範內容並非真實趨勢，也不提供原始來源連結。資料超過 26 小時未更新時，網站會提示時效。
+- Gemini 若回傳暫時性的 503 或連線錯誤，管線會依序嘗試其他 Gemini 模型；若仍無法分析，JSON 會明確記錄 `analysis_status: source_only`，並只發布近 36 小時採集到、保留來源網址的 `raw_signals`。網站會標示這些是原始標題，沒有 AI 排名、分數或商業解讀。此處理依據 [Google Gemini API 疑難排解](https://ai.google.dev/gemini-api/docs/troubleshooting)，實際模型順序與重試次數見 [管線程式](https://github.com/Kaychen46/taiwan-trend-radar/blob/main/pipeline_mvp.py)。
+- 只有 JSON 不存在，或既沒有 AI 報告也沒有原始來源標題時，網站才顯示固定的示範內容與不可隱藏的示範標籤。示範內容並非真實趨勢，也不提供原始來源連結。資料超過 26 小時未更新時，網站會提示時效。
 
 ## 啟用 GitHub Pages
 
