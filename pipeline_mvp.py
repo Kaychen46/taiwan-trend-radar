@@ -336,6 +336,29 @@ def verified_reports(reports: list[dict], signals: list[dict]) -> list[dict]:
     return verified[:MAX_FINAL_REPORTS]
 
 
+def select_source_only_signals(signals: list[dict]) -> list[dict]:
+    selected = []
+    seen_urls = set()
+    per_source = {}
+    for signal in signals:
+        source = signal["source"]
+        url = signal["url"]
+        if url in seen_urls or per_source.get(source, 0) >= 2:
+            continue
+        selected.append(signal)
+        seen_urls.add(url)
+        per_source[source] = per_source.get(source, 0) + 1
+        if len(selected) >= MAX_FINAL_REPORTS:
+            return selected
+    for signal in signals:
+        if signal["url"] not in seen_urls:
+            selected.append(signal)
+            seen_urls.add(signal["url"])
+            if len(selected) >= MAX_FINAL_REPORTS:
+                break
+    return selected
+
+
 def main():
     tz_tw = timezone(timedelta(hours=8))
     now_str = datetime.now(tz_tw).strftime("%Y-%m-%d %H:%M:%S")
@@ -358,18 +381,32 @@ def main():
             raise ValueError("未抓取到任何有效訊號，請檢查網路連線。")
 
         print(f"成功採集 {len(signals)} 則跨平台訊號，送入 Gemini 情報引擎...")
-        result, analysis_model = analyze_trends_with_ai(signals)
-        reports = verified_reports(result.get("trends", []), signals)
-        if not reports:
-            raise ValueError("AI 未產生任何附有可核對來源的報告。")
+        reports = []
+        raw_signals = []
+        analysis_model = None
+        analysis_status = "complete"
+        try:
+            result, analysis_model = analyze_trends_with_ai(signals)
+            reports = verified_reports(result.get("trends", []), signals)
+            if not reports:
+                raise ValueError("AI 未產生任何附有可核對來源的報告。")
+        except (APIConnectionError, APIStatusError) as exc:
+            retryable = isinstance(exc, APIConnectionError) or exc.status_code in (408, 500, 502, 503, 504)
+            if not retryable:
+                raise
+            analysis_status = "source_only"
+            raw_signals = select_source_only_signals(signals)
+            print("::warning::Gemini 暫時無法提供分析，本次只發布已採集的原始來源標題。", flush=True)
 
         output_payload = {
             "updated_at": now_str,
             "analysis_model": analysis_model,
+            "analysis_status": analysis_status,
             "total_signals_scanned": len(signals),
             "ptt_status": ptt_status,
             "source_status": source_status,
-            "trends": reports
+            "trends": reports,
+            "raw_signals": raw_signals
         }
 
         os.makedirs("data", exist_ok=True)
@@ -377,6 +414,8 @@ def main():
             json.dump(output_payload, f, ensure_ascii=False, indent=2)
 
         top_lines = [f"🔥 **台灣爆點雷達更新 ({now_str})**"]
+        if analysis_status == "source_only":
+            top_lines.append("Gemini 暫時無法提供分析；網站已更新為近期原始來源標題，沒有 AI 排名或解讀。")
         for idx, t in enumerate(output_payload["trends"][:3], 1):
             badge = "🐎黑馬" if t.get("is_dark_horse") else "📈熱門"
             playbook = (t.get("creator_playbook") or ["請開啟網站查看完整報告"])[0]
