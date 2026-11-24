@@ -18,3 +18,16 @@
 3. 更新 `main`、排程到時或手動啟動時，**Taiwan Trend Radar Pipeline** 都會執行。確認 `run-pipeline` 與 `deploy-pages` 都成功，再開啟 Pages 網址核對資料與來源。Pages 自訂工作流程所需的 artifact、權限與環境設定見 [GitHub 官方範例](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
 
 排程或手動執行失敗時，既有 Pages 部署不會自動消失；網站會保留上次成功發布的 JSON，並在超過 26 小時時顯示過期提示。
+
+## 自動補跑（Cloudflare 免費定時檢查）
+
+GitHub 排程可能延遲或漏掉。`worker/auto_update.mjs` 使用另一個定時服務，在台灣時間每天 15:45 與 17:00 檢查正式網站的 `updated_at`。如果當天下午 15:00 以後已有更新，便不做事；若資料仍舊，且 GitHub 沒有正在執行的同一工作流程，便啟動現有的 `run_radar.yml`。此檢查只負責補啟動，資料仍由 GitHub Actions 產生並發布。Gemini 若暫時無法分析，仍依上方所述顯示來源資料。Cloudflare 排程採 UTC，兩個時間對應 `wrangler.toml` 的 `45 7 * * *` 與 `0 9 * * *`，見 [Cloudflare Cron Triggers 文件](https://developers.cloudflare.com/workers/configuration/cron-triggers/)。
+
+首次啟用需要儲存庫擁有者自行完成以下設定，**不要把憑證傳到對話或提交到儲存庫**：
+
+1. 登入 Cloudflare，在 Workers 使用免費方案。建立一個 GitHub fine-grained personal access token，僅選取 `Kaychen46/taiwan-trend-radar`，權限只給 **Actions: Read and write**；保留其他權限為預設，設定有效期限並記下到期日。GitHub 的 [執行工作流程 API 文件](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)列出所需的 Actions write 權限。
+2. 在專案根目錄執行官方 Wrangler 的 `npx wrangler deploy`，完成 Cloudflare 登入與部署。Cron 設定會隨 `wrangler.toml` 一起發布，先確認 Worker 名稱與所屬帳號正確。
+3. 在 Cloudflare Workers & Pages 中找到 `taiwan-trend-radar-auto-update` → Settings → Variables and Secrets，新增 **Secret** `GITHUB_ACTIONS_TOKEN`，將上述 token 值直接輸入 Cloudflare 的私密欄位並部署。也可依 [Cloudflare Secrets 文件](https://developers.cloudflare.com/workers/configuration/secrets/)使用 `npx wrangler secret put GITHUB_ACTIONS_TOKEN`。不要建立一般公開變數。
+4. 在 Cloudflare 的 Cron Triggers 確認兩個排程已啟用。下一次排程後查看 Worker 日誌與 [GitHub Actions 工作流程](https://github.com/Kaychen46/taiwan-trend-radar/actions/workflows/run_radar.yml)，並重新開啟[網站](https://kaychen46.github.io/taiwan-trend-radar/)確認更新時間。憑證到期前需換新，否則自動補跑會停止。
+
+Cloudflare Workers 的 [免費方案與額度](https://developers.cloudflare.com/workers/platform/pricing/)適合這種每天兩次的輕量檢查；仍應以帳號頁面的實際方案及用量為準。這個 Worker 沒有對外的手動啟動網址，憑證不會出現在公開網站。

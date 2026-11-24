@@ -1,5 +1,7 @@
 # 機密金鑰（絕對不可上傳）
 .env
+.dev.vars
+.wrangler/
 
 # Python 執行快取與虛擬環境
 __pycache__/

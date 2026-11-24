@@ -1,0 +1,7 @@
+name = "taiwan-trend-radar-auto-update"
+main = "worker/auto_update.mjs"
+compatibility_date = "2026-11-24"
+
+# Cloudflare Cron uses UTC: 07:45 and 09:00 are 15:45 and 17:00 in Taiwan.
+[triggers]
+crons = ["45 7 * * *", "0 9 * * *"]
